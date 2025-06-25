@@ -4,7 +4,7 @@ const db = require('../config/database');
 const AccountType = db.define('AccountType', {
         id : {
             type: Sequelize.INTEGER,
-            defaultValue: 0,
+            autoIncrement: true,
             primaryKey: true,
         },
         account_status : {

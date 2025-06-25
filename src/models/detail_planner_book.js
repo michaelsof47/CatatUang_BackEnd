@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
 const db = require('../config/database');
 
-const PlannerBook = db.define('PlannerBook', {
+const PercentagePlannerBook = db.define('PercentagePlannerBook', {
         id : {
             type: Sequelize.INTEGER,
             autoIncrement: true,
@@ -11,29 +11,25 @@ const PlannerBook = db.define('PlannerBook', {
             type: Sequelize.STRING,
             allowNull: false,
         },
-        target_start : {
-            type: Sequelize.DATE,
+        percentage_amount : {
+            type: Sequelize.DOUBLE,
+            allowNull: true,
+        },
+        total_amount : {
+            type: Sequelize.DOUBLE,
             allowNull: false,
         },
-        target_end : {
-            type: Sequelize.DATE,
-            allowNull: false,
-        },
-        target_amount : {
-            type: Sequelize.INTEGER,
-            allowNull: false,
-        },
-        user_id : {
+        planner_book_id : {
             type: Sequelize.INTEGER,
             allowNull: false,
             references: {
-                model: 'User',
+                model: 'PlannerBook',
                 key: 'id',
             }
         }
     }, {
         freezeTableName: true,
-        timestamps: true,
+        timestamps: false,
     })
 
-module.exports = PlannerBook;
+module.exports = PercentagePlannerBook;

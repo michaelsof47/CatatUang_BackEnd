@@ -2,7 +2,7 @@ const User = require('../models/user');
 const bcrypt = require('bcrypt');
 
 exports.registerUser = async (req, res) => {
-    const { first_name, last_name, email, phone, password, account_type_id } = req.body;
+    const { first_name, last_name, email, phone, password} = req.body;
     const url_user_image = req.file?.buffer;
     const hashedPassword = bcrypt.hashSync(password, 10);
 
@@ -14,7 +14,7 @@ exports.registerUser = async (req, res) => {
             email,
             phone,
             password:hashedPassword,
-            account_type_id,
+            account_type_id: 1, 
         });
         res.status(201).json({ message: 'User registered successfully', user: newUser.id });
     } catch (error) {

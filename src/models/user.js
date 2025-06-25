@@ -1,5 +1,6 @@
 const Sequelize = require('sequelize');
 const db = require('../config/database');
+const AccountType = require('./account_type');
 
 const User = db.define('User', {
         id : {
@@ -36,16 +37,11 @@ const User = db.define('User', {
             type: Sequelize.STRING,
             allowNull: false,
         },
-        created_at : {
-            type: Sequelize.DATE,
-            defaultValue: Sequelize.NOW,
-            allowNull: false,
-        },
         account_type_id : {
             type: Sequelize.INTEGER,
             allowNull: false,
             references: {
-                model: 'AccountType',
+                model: AccountType,
                 key: 'id',
             }
         }   
