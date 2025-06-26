@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
 const db = require('../config/database');
 
-const Balances = db.define('Balances', {
+const Balance = db.define('Balance', {
         id : {
             type: Sequelize.INTEGER,
             autoIncrement: true,
@@ -23,4 +23,4 @@ const Balances = db.define('Balances', {
         freezeTableName: true,
     });
 
-module.exports = Balances;
+module.exports = Balance;

@@ -1,15 +1,27 @@
-const Balances = require('../models/balances');
+const Balances = require('../models/balance');
 
 exports.createBalance = async (req,res) => {
-    const { balances_amount, user_id } = req.body;
+    const { id, balances_amount, user_id } = req.body;
 
     try {
-        const newBalance = await Balances.create({
-            balances_amount,
-            user_id,
-        })
 
-        res.status(201).json({message: 'Balance created successfully'});
+        if(id == "") {
+            const balances = await Balances.create({
+                balances_amount,
+                user_id,
+            });
+            
+            res.status(201).json({message: 'Balance created successfully'});
+        } else {
+            const balances = await Balances.upsert({
+                id,
+                balances_amount,
+                user_id,
+            });
+
+            res.status(201).json({message: 'Balance updated successfully'});
+        }
+    
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error creating balance: ', error);
@@ -19,13 +31,16 @@ exports.createBalance = async (req,res) => {
 exports.getBalance = async (req,res) => {
     const { id } = req.params;
     try {
-        const balance = await Balances.findByPk(id);
+        const balance = await Balances.findOne({ where: { user_id: id}})
 
         if (!balance) {
             return res.status(404).json({ error: 'Balance Not Found' });
         }
 
-        res.status(200).json(balance.balances_amount);
+        res.status(200).json({
+            id: balance.id,
+            balances_amount: balance.balances_amount
+        });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error fetching balance: ', error);
