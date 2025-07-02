@@ -18,6 +18,21 @@ app.use('/user', userRoutes);
 app.use('/balance', balanceRoutes);
 app.use('/planner_books', plannerBookRoutes);
 app.use('/transactions', transactionRoutes);
+app.use(errorHandler);
+
+function errorHandler(err,req,res,next) {
+  let status = err.status || 500;
+  let message = err.message || "Internal server error";
+
+  switch(err.name) {
+    case "Invalid Token":
+    case "JsonWebTokenError":
+      status = 401;
+      message = "Invalid token"
+      break
+  }
+  res.status(status).json({message})
+}
 
 sequelize.sync({ alter: true })
   .then(() => {

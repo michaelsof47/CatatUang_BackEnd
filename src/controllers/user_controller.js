@@ -1,5 +1,7 @@
+require('dotenv').config;
 const User = require('../models/user');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 exports.registerUser = async (req, res) => {
     const { first_name, last_name, email, phone, password} = req.body;
@@ -55,7 +57,11 @@ exports.loginUser = async (req,res) => {
             return res.status(401).json({ error: 'Invalid Password' });
         }
 
-        res.status(200).json({ message: 'Login Successful', userId: user.id });
+        let accessToken = jwt.sign({id:user.id},process.env.JWT_SECRET, {
+            expiresIn: '1h',
+        });
+
+        res.status(200).json({ message: 'Login Successful', userId: user.id, token: accessToken });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error logging in user: ', error);
