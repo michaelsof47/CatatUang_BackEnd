@@ -2,26 +2,68 @@ require('dotenv').config;
 const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const {Op} = require('sequelize');
 
 exports.registerUser = async (req, res) => {
     const { first_name, last_name, email, phone, password} = req.body;
+    console.log("email :",email,"phone :",phone);
     const url_user_image = req.file?.buffer;
     const hashedPassword = bcrypt.hashSync(password, 10);
 
     try {
-        const newUser = await User.create({
-            first_name,
-            last_name,
-            url_user_image,
-            email,
-            phone,
-            password:hashedPassword,
-            account_type_id: 1, 
-        });
-        res.status(201).json({ message: 'User registered successfully', user: newUser.id });
+
+        const checkUser = await User.findOne({where: {
+            [Op.or] : [{email : email}, {phone: phone}]
+        }});
+
+        if(!checkUser) {
+            const newUser = await User.create({
+                first_name,
+                last_name,
+                url_user_image,
+                email,
+                phone,
+                password:hashedPassword,
+                account_type_id: 1, 
+            });
+
+            let accessToken = jwt.sign({id:newUser.id},process.env.JWT_SECRET, {
+                expiresIn: '1h',
+            });
+
+            res.status(201).json({ message: 'User registered successfully', user: newUser.id, token: accessToken });
+        } else {
+            res.status(404).json({ error: 'User already exists' });
+        }
     } catch (error) {
         res.status(500).json({ error : 'Internal Server Error'});
         console.error('Error registering user: ', error);
+    }
+}
+
+exports.updateProfile = async (req,res) => {
+    const {user_id , first_name, last_name, email, phone} = req.body;
+    const url_user_image = req.file?.buffer;
+
+    try {
+        const user = await User.findByPk(user_id);
+
+        if(!user) {
+            return res.status(404).json({error: 'User Not Found'});
+        }
+
+        user.first_name = first_name;
+        user.last_name = last_name;
+        user.url_user_image = url_user_image;
+        user.email = email;
+        user.phone = phone;
+
+        await user.save();
+
+        res.status(200).json({ message: 'Profile updated successfully', userId: user.id });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('Error updating user: ', error);
     }
 }
 
@@ -42,16 +84,18 @@ exports.getProfileImage = async (req,res) => {
 }
 
 exports.loginUser = async (req,res) => {
-    const { email, password } = req.body;
+    const { emailorphone, password } = req.body;
 
     try {
-        const user = await User.findOne({ where: { email }});
+        const user = await User.findOne({ where: { 
+            [Op.or] : [{email : emailorphone}, {phone: emailorphone}]
+         }});
 
         if (!user) {
             return res.status(404).json({ error: 'User Not Found' });
         }
 
-        const isMatch = bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid Password' });
@@ -87,6 +131,23 @@ exports.getUserById = async (req,res) => {
             email: user.email,
             phone: user.phone,
         });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('Error fetching user by ID: ', error);
+    }
+}
+
+exports.isEmailRegistered = async (req,res) => {
+    const { email } = req.body;
+
+    try {
+        const isEmailAvailable = await User.findOne({where: {email}});
+
+        if(isEmailAvailable) {
+            return res.status(200).json({message: "Silahkan Masuk"});
+        } else {
+            return res.status(200).json({message: "Silahkan Daftar"});
+        }
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error fetching user by ID: ', error);

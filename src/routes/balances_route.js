@@ -3,6 +3,7 @@ const multer = require('multer');
 const router = express.Router();
 const balancesController = require('../controllers/balances_controller');
 const upload = multer({ storage: multer.memoryStorage() });
+const authentication = require('../middleware/authentication');
 
 router.post('/create_balances', authentication, upload.none(), balancesController.createBalance);
 router.get('/:id', authentication, balancesController.getBalance);
