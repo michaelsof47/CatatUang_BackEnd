@@ -13,7 +13,7 @@ async function authentication(req, res, next) {
 
         if (!req.headers.authorization) {
             console.log("Error: No Authorization header.");
-            throw { name: "Invalid token" };
+            throw { name: "Token tidak sesuai" };
         }
 
         let [type, token] = req.headers.authorization.split(" ");
@@ -22,7 +22,7 @@ async function authentication(req, res, next) {
 
         if (type !== "Bearer") {
             console.log("Error: Token type is not Bearer.");
-            throw { name: "Invalid token" };
+            throw { name: "Token tidak sesuai" };
         }
 
         let payload = jwt.verify(token, JWT_SECRET);
@@ -30,7 +30,7 @@ async function authentication(req, res, next) {
 
         if (!payload || !payload.id) {
             console.log("Error: Payload is missing or id is missing from payload.");
-            throw { name: "Invalid token" };
+            throw { name: "Token tidak sesuai" };
         }
 
         let user1 = await user.findByPk(payload.id);
@@ -38,7 +38,7 @@ async function authentication(req, res, next) {
 
         if (!user1) {
             console.log("Error: User not found in database for ID:", payload.id);
-            throw { name: "Invalid token" };
+            throw { name: "Token tidak sesuai" };
         }
 
         req.user = { id: user1.id };

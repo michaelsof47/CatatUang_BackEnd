@@ -41,15 +41,12 @@ exports.createTransaction = async (req,res) => {
         });
         
         res.status(201).json({
-            message: 'Transaction created successfully',
+            message: 'Transaksi berhasil dibuat',
             transaction: newTransaction.id,
         });
     } catch (error) {
+        res.status(500).json({message: 'Internal Server Error'});
         console.error('Error creating transaction:', error);
-        res.status(500).json({
-            message: 'Failed to create transaction',
-            error: error.message,
-        });
     }
 }
 
@@ -64,11 +61,11 @@ exports.createCategory = async (req,res) => {
         });
 
         res.status(201).json({
-            message: 'Category created successfully',
+            message: 'Kategori berhasil dibuat',
             category: newCategory.id,
         });
     } catch (error) {
+        res.status(500).json({message: 'Internal Server Error'});
         console.error('Error creating category:', error);
-        res.status(500).json({message: 'Failed to create category',error: error.message});
     }
 }

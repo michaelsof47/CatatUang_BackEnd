@@ -11,7 +11,7 @@ exports.createNewBook = async (req,res) => {
         });
 
         if(existingBook) {
-            return res.status(400).json({ error: 'Book with this name already exists' });
+            return res.status(400).json({ error: 'Buku dengan nama yang sama sudah ada' });
         }
 
         const createBook = await plannerBook.create({
@@ -21,7 +21,7 @@ exports.createNewBook = async (req,res) => {
             target_amount,
             user_id,
         })
-        res.status(201).json({ message: 'Book created successfully', bookId: createBook.id });
+        res.status(201).json({ message: 'Buku berhasil dibuat', bookId: createBook.id });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error creating book: ', error);
@@ -38,7 +38,7 @@ exports.getAllBooks = async (req, res) => {
         });
 
         if (books.length === 0) {
-            return res.status(404).json({ message: 'No Books Found' });
+            return res.status(404).json({ message: 'Buku tidak ditemukan' });
         }    
 
         res.status(200).json({
@@ -65,7 +65,7 @@ exports.updateBook = async (req,res) => {
         const book = await plannerBook.findByPk(book_id);
 
         if(!book) {
-            return res.status(404).json({ error: 'Book Not Found' });
+            return res.status(404).json({ error: 'Buku tidak ditemukan' });
         }
 
         book.name = book_name;
@@ -75,7 +75,7 @@ exports.updateBook = async (req,res) => {
 
         await book.save();
 
-        res.status(200).json({ message: 'Book updated successfully', bookId: book.id });
+        res.status(200).json({ message: 'Buku berhasil diperbarui', bookId: book.id });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error updating book: ', error);
@@ -89,16 +89,16 @@ exports.checkTotalAmountLimit = async (req,res) => {
         const book = await plannerBook.findByPk(book_id);
 
         if (!book) {
-            return res.status(404).json({ error: 'Book Not Found' });
+            return res.status(404).json({ error: 'Buku tidak ditemukan' });
         }
 
         const totalAmount = book.target_amount;
 
         if(current_amount > totalAmount) {
-            return res.status(400).json({ error: 'Current Amount Exceeds Target Amount' });
+            return res.status(400).json({ error: 'Jumlah nominal melebihi batas yang ditentukan' });
         }
 
-        res.status(200).json({ message: 'Current Amount is within the limit' });
+        res.status(200).json({ message: 'Jumlah nominal sesuai batas yang ditentukan' });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error checking total amount limit: ', error);
@@ -114,9 +114,8 @@ exports.createDetailPlannerBook = async (req, res) => {
         const book = await plannerBook.findByPk(book_id);
 
         if (!book) {
-            return res.status(404).json({ error: 'Book Not Found' });
+            return res.status(404).json({ error: 'Buku tidak ditemukan' });
         }
-
         
 
         const existingDetail = await detailPlannerBook.findOne({
@@ -124,7 +123,7 @@ exports.createDetailPlannerBook = async (req, res) => {
         });
 
         if (existingDetail) {
-            return res.status(400).json({ error: 'Detail with this name already exists' });
+            return res.status(400).json({ error: 'Detail dengan nama yang sama sudah ada' });
         }
 
         const detail = await detailPlannerBook.create({
@@ -133,7 +132,7 @@ exports.createDetailPlannerBook = async (req, res) => {
             planner_book_id: book_id,
         });
 
-        res.status(201).json({ message: 'Detail created successfully', detailId: detail.id });
+        res.status(201).json({ message: 'Detail berhasil dibuat', detailId: detail.id });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
         console.error('Error creating detail planner book: ', error);
@@ -150,7 +149,7 @@ exports.getAllDetailPlannerBooks = async (req,res) => {
         });
 
         if (details.length === 0) {
-            return res.status(404).json({ message: 'No Details Found' });
+            return res.status(404).json({ message: 'Detail tidak ditemukan' });
         }
 
         res.status(200).json({
