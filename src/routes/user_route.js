@@ -7,7 +7,7 @@ const authentication = require('../middleware/authentication');
 
 router.post('/register', upload.single('url_user_image'), userController.registerUser);
 router.post('/update_profile',authentication, upload.none(),userController.updateProfile);
-router.get('/:id/profile_picture', userController.getProfileImage)
+router.get('/:id/profile_picture', userController.getProfileImage);
 router.post('/login', upload.none(), userController.loginUser);
 router.get('/:id',authentication, userController.getUserById);
 router.post('/update_photo_profile', authentication, upload.single('url_user_image'), userController.updatePhotoProfile);

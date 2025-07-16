@@ -18,6 +18,14 @@ const Category = db.define('Category', {
         url_image : {
             type: Sequelize.BLOB,
             allowNull: true,
+        },
+        user_id : {
+            type: Sequelize.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'User',
+                key: 'id',
+            }
         }
     }, {
         freezeTableName: true,
