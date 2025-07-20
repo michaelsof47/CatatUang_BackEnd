@@ -11,7 +11,6 @@ exports.createTransaction = async (req, res) => {
     trans_disc_percent,
     trans_disc_rp,
     trans_total_price,
-    user_id,
     category_id,
     balances_id,
   } = req.body;
@@ -36,7 +35,7 @@ exports.createTransaction = async (req, res) => {
       disc_percent: trans_disc_percent,
       disc_rp: trans_disc_rp,
       total_price: trans_total_price,
-      user_id: user_id,
+      user_id: req.user.id,
       category_id: category_id,
     });
 
@@ -51,7 +50,7 @@ exports.createTransaction = async (req, res) => {
 };
 
 exports.createCategory = async (req, res) => {
-  const { cat_name, cat_desc, user_id } = req.body;
+  const { cat_name, cat_desc} = req.body;
   const cat_url_image = req.file?.buffer;
 
   try {
@@ -59,7 +58,7 @@ exports.createCategory = async (req, res) => {
       name: cat_name,
       description: cat_desc,
       url_image: cat_url_image,
-      user_id: user_id,
+      user_id: req.user.id,
     });
 
     res.status(201).json({
@@ -73,11 +72,9 @@ exports.createCategory = async (req, res) => {
 };
 
 exports.getTransaction = async (req, res) => {
-  const userId = req.params.id;
-
   try {
     const transactionData = await transaction.findAll({
-      where: { user_id: userId },
+      where: { user_id: req.user.id },
       order: [["id", "DESC"]],
     });
 
@@ -96,6 +93,7 @@ exports.getTransaction = async (req, res) => {
         disc_percent: transaction.disc_percent,
         disc_rp: transaction.disc_rp,
         total_price: transaction.total_price,
+        created_at: transaction.createdAt,
       })),
     });
   } catch (error) {
@@ -105,10 +103,9 @@ exports.getTransaction = async (req, res) => {
 };
 
 exports.getCategory = async (req, res) => {
-  const userId = req.params.id;
 
   try {
-    const categoryData = await category.findAll({ where: { user_id: userId } });
+    const categoryData = await category.findAll({ where: { user_id: req.user.id } });
 
     if (categoryData.length === 0) {
       return res.status(404).json({ error: "Kategori tidak ditemukan" });

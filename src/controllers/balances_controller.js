@@ -1,13 +1,13 @@
 const Balances = require("../models/balance");
 
 exports.createOrUpdateBalance = async (req, res) => {
-  const { id, balances_amount, user_id } = req.body;
+  const { id, balances_amount} = req.body;
 
   try {
     if (id == "") {
       await Balances.create({
         balances_amount,
-        user_id,
+        user_id: req.user.id,
       });
 
       res.status(201).json({ message: "Saldo berhasil dibuat" });
@@ -15,7 +15,7 @@ exports.createOrUpdateBalance = async (req, res) => {
       await Balances.upsert({
         id,
         balances_amount,
-        user_id,
+        user_id: req.user.id,
       });
 
       res.status(201).json({ message: "Saldo berhasil diperbarui" });
@@ -46,10 +46,10 @@ exports.getBalance = async (req, res) => {
 };
 
 exports.addMoreBalance = async (req, res) => {
-  const { balances_amount, user_id } = req.body;
+  const { balances_amount } = req.body;
 
   try {
-    const balance = await Balances.findOne({ where: { user_id } });
+    const balance = await Balances.findOne({ where: { user_id: req.user.id } });
 
     if (!balance) {
       return res.status(404).json({ error: "Saldo tidak ditemukan" });

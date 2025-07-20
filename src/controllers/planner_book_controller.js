@@ -7,7 +7,6 @@ exports.createNewBook = async (req, res) => {
     target_start_date,
     target_end_date,
     target_amount,
-    user_id,
   } = req.body;
 
   try {
@@ -26,7 +25,7 @@ exports.createNewBook = async (req, res) => {
       target_start: target_start_date,
       target_end: target_end_date,
       target_amount,
-      user_id,
+      user_id: req.user.id,
     });
     res
       .status(201)
@@ -38,11 +37,10 @@ exports.createNewBook = async (req, res) => {
 };
 
 exports.getAllBooks = async (req, res) => {
-  const userId = req.params.id;
 
   try {
     const books = await plannerBook.findAll({
-      where: { user_id: userId },
+      where: { user_id: req.user.id },
       order: [["id", "ASC"]],
     });
 

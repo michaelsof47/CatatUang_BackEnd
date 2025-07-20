@@ -52,11 +52,10 @@ exports.registerUser = async (req, res) => {
 };
 
 exports.updatePhotoProfile = async (req, res) => {
-  const { user_id } = req.body;
   const url_user_image = req.file?.buffer;
 
   try {
-    const user = await User.findByPk(user_id);
+    const user = await User.findByPk(req.user.id);
 
     if (!user) {
       return res.status(404).json({ error: "User tidak ditemukan" });
@@ -74,10 +73,10 @@ exports.updatePhotoProfile = async (req, res) => {
 };
 
 exports.updateProfile = async (req, res) => {
-  const { user_id, first_name, last_name, email, phone } = req.body;
+  const {first_name, last_name, email, phone } = req.body;
 
   try {
-    const user = await User.findByPk(user_id);
+    const user = await User.findByPk(req.user.id);
 
     if (!user) {
       return res.status(404).json({ error: "User tidak ditemukan" });
@@ -147,17 +146,14 @@ exports.loginUser = async (req, res) => {
 };
 
 exports.getUserById = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const user = await User.findByPk(id);
+    const user = await User.findByPk(req.user.id);
 
     if (!user) {
       return res.status(404).json({ error: "User tidak ditemukan" });
     }
 
     res.status(200).json({
-      id: user.id,
       first_name: user.first_name,
       last_name: user.last_name,
       reward_status: user.reward_status,

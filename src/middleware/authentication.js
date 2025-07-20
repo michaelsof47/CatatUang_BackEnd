@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-require('dotenv').config;
+require('dotenv').config();
 const user = require('../models/user');
 
 async function authentication(req, res, next) {
@@ -34,7 +34,7 @@ async function authentication(req, res, next) {
         }
 
         let user1 = await user.findByPk(payload.id);
-        console.log("User found from DB:", user ? user.id : "None");
+        console.log("User found from DB:", user1 ? user1.id : "None");
 
         if (!user1) {
             console.log("Error: User not found in database for ID:", payload.id);
