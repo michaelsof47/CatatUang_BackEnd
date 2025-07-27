@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const redisClient = require('../config/redis');
 require('dotenv').config();
 const user = require('../models/user');
 
@@ -13,7 +14,7 @@ async function authentication(req, res, next) {
 
         if (!req.headers.authorization) {
             console.log("Error: No Authorization header.");
-            throw { name: "Token tidak sesuai" };
+            throw { name: "Invalid Token" };
         }
 
         let [type, token] = req.headers.authorization.split(" ");
@@ -22,7 +23,13 @@ async function authentication(req, res, next) {
 
         if (type !== "Bearer") {
             console.log("Error: Token type is not Bearer.");
-            throw { name: "Token tidak sesuai" };
+            throw { name: "Invalid Token" };
+        }
+
+        const blacklisted = await redisClient.get(`blacklisted:${token}`);
+        
+        if(blacklisted) {
+            return res.status(401).json({ message: "Token is Blocked"});
         }
 
         let payload = jwt.verify(token, JWT_SECRET);
@@ -30,7 +37,7 @@ async function authentication(req, res, next) {
 
         if (!payload || !payload.id) {
             console.log("Error: Payload is missing or id is missing from payload.");
-            throw { name: "Token tidak sesuai" };
+            throw { name: "Invalid Token" };
         }
 
         let user1 = await user.findByPk(payload.id);
@@ -38,7 +45,7 @@ async function authentication(req, res, next) {
 
         if (!user1) {
             console.log("Error: User not found in database for ID:", payload.id);
-            throw { name: "Token tidak sesuai" };
+            throw { name: "Invalid Token" };
         }
 
         req.user = { id: user1.id };

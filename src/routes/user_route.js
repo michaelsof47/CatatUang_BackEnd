@@ -12,5 +12,6 @@ router.post('/login', upload.none(), userController.loginUser);
 router.get('/',authentication, userController.getUserById);
 router.post('/update_photo_profile', authentication, upload.single('url_user_image'), userController.updatePhotoProfile);
 router.post('/check_email', upload.none(), userController.isEmailRegistered);
+router.post('/logout', authentication, userController.logoutUser);
 
 module.exports = router;

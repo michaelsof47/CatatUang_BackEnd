@@ -2,7 +2,9 @@ require("dotenv").config;
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const redis = require('../config/redis');
 const { Op } = require("sequelize");
+const client = require("../config/redis");
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -117,7 +119,19 @@ exports.getProfileImage = async (req, res) => {
 exports.loginUser = async (req, res) => {
   const { emailorphone, password } = req.body;
 
+  const userIp = req.ip || req.connection.remoteAddress;
+  const loginAttemptKey = `login_attempts:${userIp}`;
+  const LOCKOUT_TIME_SECONDS = 5*60;
+
   try {
+    const currentAttempts = await redis.get(loginAttemptKey);
+
+    if(currentAttempts && parseInt(currentAttempts) >= 3) {
+      return res.status(429).json({
+        error: `Terlalu banyak percobaan login. Silahkan coba lagi nanti ${LOCKOUT_TIME_SECONDS / 60} menit`
+      })
+    }
+
     const user = await User.findOne({
       where: {
         [Op.or]: [{ email: emailorphone }, { phone: emailorphone }],
@@ -125,14 +139,27 @@ exports.loginUser = async (req, res) => {
     });
 
     if (!user) {
+
+      await redis.incr(loginAttemptKey);
+
+      if(currentAttempts === null) {
+        await redis.setEx(loginAttemptKey, LOCKOUT_TIME_SECONDS, 'true');
+      }
       return res.status(404).json({ error: "User tidak ditemukan" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
+      await redis.incr(loginAttemptKey);
+
+      if(currentAttempts === null) {
+        await redis.setEx(loginAttemptKey, LOCKOUT_TIME_SECONDS, 'true');
+      }
       return res.status(401).json({ error: "Password salah" });
     }
+
+    await redis.del(loginAttemptKey);
 
     let accessToken = generateToken(user.id);
 
@@ -188,3 +215,39 @@ exports.isEmailRegistered = async (req, res) => {
     console.error("Error fetching user by ID: ", error);
   }
 };
+
+exports.logoutUser = async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if(!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(400).json({message: 'Token tidak ditemukan'});
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  if(!token) {
+    return res.status(400).json({message: 'Token tidak ditemukan'});
+  }
+
+  try {
+    const decoded = jwt.decode(token);
+
+    if(!decoded || !decoded.exp) {
+      return res.status(400).json({message: 'Token tidak valid'});
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const expiresIn = decoded.exp - now;
+
+    if(expiresIn <= 0) {
+      return res.status(200).json({message: 'Logout berhasil'});
+    }
+
+    await redis.setEx(`blacklisted:${token}`, expiresIn, 'true');
+
+    res.status(200).json({message: 'Logout berhasil'});
+  } catch (error) {
+    res.status(500).json({error: 'Internal Server Error'});
+    console.error("Error logout user by ID: ", error);
+  }
+}

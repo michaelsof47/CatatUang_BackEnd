@@ -27,9 +27,8 @@ exports.createOrUpdateBalance = async (req, res) => {
 };
 
 exports.getBalance = async (req, res) => {
-  const { id } = req.params;
   try {
-    const balance = await Balances.findByPk(id);
+    const balance = await Balances.findOne({ where: { user_id: req.user.id } });
 
     if (!balance) {
       return res.status(404).json({ error: "Saldo tidak ditemukan" });
