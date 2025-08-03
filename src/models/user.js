@@ -22,7 +22,7 @@ const User = db.define('User', {
             allowNull: false,
         },
         url_user_image : {
-            type: Sequelize.BLOB,
+            type: Sequelize.TEXT('long'),
             allowNull: true,
         },
         email : {

@@ -4,12 +4,26 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const redis = require('../config/redis');
 const { Op } = require("sequelize");
-const client = require("../config/redis");
+const sharp = require('sharp');
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
+
+const bufferToBase64 = (buffer) => {
+  return buffer.toString("base64")
+}
+
+const base64ToBuffer = (base64) => {
+  const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+
+  if(!matches || matches.length !== 3) {
+    return Buffer.from(base64, 'base64');
+  }
+
+  return Buffer.from(matches[2], 'base64');
+}
 
 exports.registerUser = async (req, res) => {
   const { first_name, last_name, email, phone, password } = req.body;
@@ -25,10 +39,16 @@ exports.registerUser = async (req, res) => {
     });
 
     if (!checkUser) {
+      let base64Image = null;
+
+      if(url_user_image) {
+        base64Image = bufferToBase64(url_user_image);
+      }
+
       const newUser = await User.create({
         first_name,
         last_name,
-        url_user_image,
+        url_user_image: base64Image,
         email,
         phone,
         password: hashedPassword,
@@ -79,6 +99,7 @@ exports.updateProfile = async (req, res) => {
 
   try {
     const user = await User.findByPk(req.user.id);
+    
 
     if (!user) {
       return res.status(404).json({ error: "User tidak ditemukan" });
@@ -107,9 +128,20 @@ exports.getProfileImage = async (req, res) => {
     if (!user || !user.url_user_image) {
       return res.status(404).send("Foto profil tidak ditemukan");
     }
+    const imageBuffer = base64ToBuffer(user.url_user_image);
+
+    const compressedImageBuffer = await sharp(imageBuffer,{rotate: false})
+        .resize({width: 500, height: 500})
+        .jpeg({quality: 80})
+        .toBuffer()
+    
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.set("Content-Type", "image/jpeg");
-    res.send(user.url_user_image);
+
+    res.send(compressedImageBuffer);
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
     console.error("Error fetching profile image: ", error);
@@ -251,3 +283,25 @@ exports.logoutUser = async (req, res) => {
     console.error("Error logout user by ID: ", error);
   }
 }
+
+exports.updatePassword = async (req, res) => {
+    const { password } = req.body;
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    
+    try {
+      const user = await User.findByPk(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User tidak ditemukan" });
+      }
+
+      user.password = hashedPassword;
+
+      await user.save();
+
+      res.status(200).json({ message: "Password berhasil diperbarui" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal Server Error" });
+      console.error("Error updating password: ", error);
+    }
+  }
