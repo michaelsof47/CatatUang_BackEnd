@@ -1,6 +1,6 @@
-const transaction = require("../models/transaction");
-const balances = require("../models/balance");
-const category = require("../models/category");
+const container = require("../container");
+
+const { Transaction, Category, Balances } = container.cradle;
 
 exports.createTransaction = async (req, res) => {
   const {
@@ -16,7 +16,7 @@ exports.createTransaction = async (req, res) => {
   } = req.body;
 
   try {
-    const balance = await balances.findByPk(balances_id);
+    const balance = await Balances.findByPk(balances_id);
     console.log("Balance found:", balance);
     balance.balances_amount -= trans_total_price;
     await balance.save();
@@ -27,7 +27,7 @@ exports.createTransaction = async (req, res) => {
       });
     }
 
-    const newTransaction = await transaction.create({
+    const newTransaction = await Transaction.create({
       name: trans_name,
       amount: trans_amount,
       outlet_name,
@@ -41,20 +41,20 @@ exports.createTransaction = async (req, res) => {
 
     res.status(201).json({
       message: "Transaksi berhasil dibuat",
-      transaction: newTransaction.id,
+      Transaction: newTransaction.id,
     });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" });
-    console.error("Error creating transaction:", error);
+    console.error("Error creating Transaction:", error);
   }
 };
 
 exports.createCategory = async (req, res) => {
-  const { cat_name, cat_desc} = req.body;
+  const { cat_name, cat_desc } = req.body;
   const cat_url_image = req.file?.buffer;
 
   try {
-    const newCategory = await category.create({
+    const newCategory = await Category.create({
       name: cat_name,
       description: cat_desc,
       url_image: cat_url_image,
@@ -73,39 +73,40 @@ exports.createCategory = async (req, res) => {
 
 exports.getTransaction = async (req, res) => {
   try {
-    const transactionData = await transaction.findAll({
+    const TransactionData = await Transaction.findAll({
       where: { user_id: req.user.id },
       order: [["id", "DESC"]],
     });
 
-    if (transactionData.length === 0) {
+    if (TransactionData.length === 0) {
       return res.status(404).json({ error: "Transaksi tidak ditemukan" });
     }
 
     res.status(200).json({
-      count: transactionData.length,
-      details_item: transactionData.map((transaction) => ({
-        id: transaction.id,
-        name: transaction.name,
-        amount: transaction.amount,
-        outlet_name: transaction.outlet_name,
-        price: transaction.price,
-        disc_percent: transaction.disc_percent,
-        disc_rp: transaction.disc_rp,
-        total_price: transaction.total_price,
-        created_at: transaction.createdAt,
+      count: TransactionData.length,
+      details_item: TransactionData.map((Transaction) => ({
+        id: Transaction.id,
+        name: Transaction.name,
+        amount: Transaction.amount,
+        outlet_name: Transaction.outlet_name,
+        price: Transaction.price,
+        disc_percent: Transaction.disc_percent,
+        disc_rp: Transaction.disc_rp,
+        total_price: Transaction.total_price,
+        created_at: Transaction.createdAt,
       })),
     });
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching transaction: ", error);
+    console.error("Error fetching Transaction: ", error);
   }
 };
 
 exports.getCategory = async (req, res) => {
-
   try {
-    const categoryData = await category.findAll({ where: { user_id: req.user.id } });
+    const categoryData = await Category.findAll({
+      where: { user_id: req.user.id },
+    });
 
     if (categoryData.length === 0) {
       return res.status(404).json({ error: "Kategori tidak ditemukan" });
@@ -127,7 +128,7 @@ exports.getCategory = async (req, res) => {
 
 exports.getCategoryImage = async (req, res) => {
   try {
-    const categoryImage = await category.findByPk(req.params.id);
+    const categoryImage = await Category.findByPk(req.params.id);
 
     if (!categoryImage || !categoryImage.url_image) {
       return res.status(404).send("Gambar kategori tidak ditemukan");

@@ -1,4 +1,6 @@
-const Balances = require("../models/balance");
+const container = require("../container");
+
+const { Balances } = container.cradle;
 
 exports.createOrUpdateBalance = async (req, res) => {
   const { id, balances_amount} = req.body;

@@ -1,29 +1,8 @@
 require("dotenv").config;
-const User = require("../models/user");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const redis = require('../config/redis');
-const { Op } = require("sequelize");
-const sharp = require('sharp');
 
-const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
+const container = require('../container');
 
-const bufferToBase64 = (buffer) => {
-  return buffer.toString("base64")
-}
-
-const base64ToBuffer = (base64) => {
-  const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-
-  if(!matches || matches.length !== 3) {
-    return Buffer.from(base64, 'base64');
-  }
-
-  return Buffer.from(matches[2], 'base64');
-}
+const {User, bcrypt, jwt, Op, redis, sharp, generateToken, bufferToBase64, base64ToBuffer} = container.cradle;
 
 exports.registerUser = async (req, res) => {
   const { first_name, last_name, email, phone, password } = req.body;

@@ -1,16 +1,13 @@
-const plannerBook = require("../models/planner_book");
-const detailPlannerBook = require("../models/detail_planner_book");
+const container = require("../container");
+
+const { PlannerBook, DetailPlannerBook } = container.cradle;
 
 exports.createNewBook = async (req, res) => {
-  const {
-    book_name,
-    target_start_date,
-    target_end_date,
-    target_amount,
-  } = req.body;
+  const { book_name, target_start_date, target_end_date, target_amount } =
+    req.body;
 
   try {
-    const existingBook = await plannerBook.findOne({
+    const existingBook = await PlannerBook.findOne({
       where: { name: book_name },
     });
 
@@ -20,7 +17,7 @@ exports.createNewBook = async (req, res) => {
         .json({ error: "Buku dengan nama yang sama sudah ada" });
     }
 
-    const createBook = await plannerBook.create({
+    const createBook = await PlannerBook.create({
       name: book_name,
       target_start: target_start_date,
       target_end: target_end_date,
@@ -37,9 +34,8 @@ exports.createNewBook = async (req, res) => {
 };
 
 exports.getAllBooks = async (req, res) => {
-
   try {
-    const books = await plannerBook.findAll({
+    const books = await PlannerBook.findAll({
       where: { user_id: req.user.id },
       order: [["id", "ASC"]],
     });
@@ -75,13 +71,13 @@ exports.updateBook = async (req, res) => {
   } = req.body;
 
   try {
-    const book = await plannerBook.findByPk(book_id);
+    const book = await PlannerBook.findByPk(book_id);
 
     if (!book) {
       return res.status(404).json({ error: "Buku tidak ditemukan" });
     }
 
-    const existingBook = await plannerBook.findOne({
+    const existingBook = await PlannerBook.findOne({
       where: { name: book_name },
     });
 
@@ -111,7 +107,7 @@ exports.checkTotalAmountLimit = async (req, res) => {
   const { book_id, current_amount } = req.body;
 
   try {
-    const book = await plannerBook.findByPk(book_id);
+    const book = await PlannerBook.findByPk(book_id);
 
     if (!book) {
       return res.status(404).json({ error: "Buku tidak ditemukan" });
@@ -139,13 +135,13 @@ exports.createDetailPlannerBook = async (req, res) => {
   console.log("Received body:", req.body);
 
   try {
-    const book = await plannerBook.findByPk(book_id);
+    const book = await PlannerBook.findByPk(book_id);
 
     if (!book) {
       return res.status(404).json({ error: "Buku tidak ditemukan" });
     }
 
-    const existingDetail = await detailPlannerBook.findOne({
+    const existingDetail = await DetailPlannerBook.findOne({
       where: { name: detail_book_name },
     });
 
@@ -155,7 +151,7 @@ exports.createDetailPlannerBook = async (req, res) => {
         .json({ error: "Detail dengan nama yang sama sudah ada" });
     }
 
-    const detail = await detailPlannerBook.create({
+    const detail = await DetailPlannerBook.create({
       name: detail_book_name,
       total_amount,
       planner_book_id: book_id,
@@ -174,7 +170,7 @@ exports.getAllDetailPlannerBooks = async (req, res) => {
   const bookId = req.params.id;
 
   try {
-    const details = await detailPlannerBook.findAll({
+    const details = await DetailPlannerBook.findAll({
       where: { planner_book_id: bookId },
       order: [["id", "ASC"]],
     });
