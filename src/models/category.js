@@ -16,7 +16,7 @@ const Category = db.define('Category', {
             allowNull: true,
         },
         url_image : {
-            type: Sequelize.BLOB,
+            type: Sequelize.TEXT('long'),
             allowNull: true,
         },
         user_id : {

@@ -1,5 +1,7 @@
+require("dotenv").config();
 const express = require('express');
 const app = express();
+const { AppError } = require('./src/utils/index');
 const ngrok = require('ngrok');
 const db = require('./src/config/database');
 const {sequelize} = require('./src/models');
@@ -20,18 +22,23 @@ app.use('/planner_books', plannerBookRoutes);
 app.use('/transactions', transactionRoutes);
 app.use(errorHandler);
 
-function errorHandler(err,req,res,next) {
-  let status = err.status || 500;
-  let message = err.message || "Internal server error";
+function errorHandler(err, req, res, next) {
+  console.error("Global Error Handler:", err); // Logging error
 
-  switch(err.name) {
-    case "Invalid Token":
-    case "JsonWebTokenError":
-      status = 401;
-      message = "Invalid token"
-      break
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({ error: err.message });
   }
-  res.status(status).json({message})
+
+  if (err.name === "Invalid Token" || err.name === "JsonWebTokenError") {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+
+  if (err.name === "TokenExpiredError") {
+    return res.status(401).json({ error: "Token has expired, please login again" });
+  }
+
+  // Default to 500 server error
+  return res.status(500).json({ error: "Internal Server Error" });
 }
 
 sequelize.sync({ alter: true })

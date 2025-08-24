@@ -1,143 +1,114 @@
-const container = require("../container");
+class TransactionController {
+  constructor({ TransactionService }) {
+    this.TransactionService = TransactionService;
+  }
 
-const { Transaction, Category, Balances } = container.cradle;
+  createTransaction = async (req, res, next) => {
+    try {
+      const newTransaction = await this.TransactionService.createTransaction(
+        req.user.id,
+        req.body
+      );
 
-exports.createTransaction = async (req, res) => {
-  const {
-    trans_name,
-    trans_amount,
-    outlet_name,
-    trans_price,
-    trans_disc_percent,
-    trans_disc_rp,
-    trans_total_price,
-    category_id,
-    balances_id,
-  } = req.body;
-
-  try {
-    const balance = await Balances.findByPk(balances_id);
-    console.log("Balance found:", balance);
-    balance.balances_amount -= trans_total_price;
-    await balance.save();
-
-    if (balance.balances_amount < 0) {
-      return res.status(400).json({
-        message: "Insufficient balance",
+      res.status(201).json({
+        message: "Transaksi berhasil dibuat",
+        transaction_id: newTransaction.id,
       });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    const newTransaction = await Transaction.create({
-      name: trans_name,
-      amount: trans_amount,
-      outlet_name,
-      price: trans_price,
-      disc_percent: trans_disc_percent,
-      disc_rp: trans_disc_rp,
-      total_price: trans_total_price,
-      user_id: req.user.id,
-      category_id: category_id,
-    });
+  createCategory = async (req, res, next) => {
+    const cat_url_image = req.file?.buffer;
 
-    res.status(201).json({
-      message: "Transaksi berhasil dibuat",
-      Transaction: newTransaction.id,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-    console.error("Error creating Transaction:", error);
-  }
-};
+    try {
+      const newCategory = await this.TransactionService.createCategory(
+        req.user.id,
+        req.body,
+        cat_url_image
+      );
 
-exports.createCategory = async (req, res) => {
-  const { cat_name, cat_desc } = req.body;
-  const cat_url_image = req.file?.buffer;
-
-  try {
-    const newCategory = await Category.create({
-      name: cat_name,
-      description: cat_desc,
-      url_image: cat_url_image,
-      user_id: req.user.id,
-    });
-
-    res.status(201).json({
-      message: "Kategori berhasil dibuat",
-      category: newCategory.id,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
-    console.error("Error creating category:", error);
-  }
-};
-
-exports.getTransaction = async (req, res) => {
-  try {
-    const TransactionData = await Transaction.findAll({
-      where: { user_id: req.user.id },
-      order: [["id", "DESC"]],
-    });
-
-    if (TransactionData.length === 0) {
-      return res.status(404).json({ error: "Transaksi tidak ditemukan" });
+      res.status(201).json({
+        message: "Kategori berhasil dibuat",
+        category_id: newCategory.id,
+      });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    res.status(200).json({
-      count: TransactionData.length,
-      details_item: TransactionData.map((Transaction) => ({
-        id: Transaction.id,
-        name: Transaction.name,
-        amount: Transaction.amount,
-        outlet_name: Transaction.outlet_name,
-        price: Transaction.price,
-        disc_percent: Transaction.disc_percent,
-        disc_rp: Transaction.disc_rp,
-        total_price: Transaction.total_price,
-        created_at: Transaction.createdAt,
-      })),
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching Transaction: ", error);
-  }
-};
+  getTransaction = async (req, res, next) => {
+    try {
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 10;
+      const offset = (page - 1) * limit;
 
-exports.getCategory = async (req, res) => {
-  try {
-    const categoryData = await Category.findAll({
-      where: { user_id: req.user.id },
-    });
+      const { transactions, totalItems } = await this.TransactionService.getTransaction(
+        req.user.id,
+        { limit, offset }
+      );
 
-    if (categoryData.length === 0) {
-      return res.status(404).json({ error: "Kategori tidak ditemukan" });
+      const totalPages = Math.ceil(totalItems / limit);
+
+      res.status(200).json({
+        pagination: {
+          totalItems,
+          totalPages,
+          currentPage: page,
+          pageSize: limit,
+        },
+        data: transactions.map((transaction) => ({
+          id: transaction.id,
+          name: transaction.name,
+          amount: transaction.amount,
+          outlet_name: transaction.outlet_name,
+          price: transaction.price,
+          disc_percent: transaction.disc_percent,
+          disc_rp: transaction.disc_rp,
+          total_price: transaction.total_price,
+          created_at: transaction.createdAt,
+        })),
+      });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    res.status(200).json({
-      count: categoryData.length,
-      details_item: categoryData.map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-        description: cat.description,
-      })),
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching category: ", error);
-  }
-};
+  getCategory = async (req, res, next) => {
+    try {
+      const categoriesWithUrls = await this.TransactionService.getCategory(
+        req.user.id
+      );
 
-exports.getCategoryImage = async (req, res) => {
-  try {
-    const categoryImage = await Category.findByPk(req.params.id);
-
-    if (!categoryImage || !categoryImage.url_image) {
-      return res.status(404).send("Gambar kategori tidak ditemukan");
+      res.status(200).json({
+        count: categoriesWithUrls.length,
+        details_item: categoriesWithUrls,
+      });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    res.set("Content-Type", "image/jpeg");
-    res.send(categoryImage.url_image);
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching category image: ", error);
-  }
-};
+  getCategoryImage = async (req, res, next) => {
+    const { token } = req.query;
+    const { categoryId } = req.params;
+    try {
+      const categoryImage = await this.TransactionService.getCategoryImage(
+        token,
+        categoryId
+      );
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      res.set("Content-Type", "image/jpeg");
+      res.send(categoryImage);
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+module.exports = TransactionController;

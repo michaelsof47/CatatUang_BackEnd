@@ -1,195 +1,121 @@
-const container = require("../container");
-
-const { PlannerBook, DetailPlannerBook } = container.cradle;
-
-exports.createNewBook = async (req, res) => {
-  const { book_name, target_start_date, target_end_date, target_amount } =
-    req.body;
-
-  try {
-    const existingBook = await PlannerBook.findOne({
-      where: { name: book_name },
-    });
-
-    if (existingBook) {
-      return res
-        .status(400)
-        .json({ error: "Buku dengan nama yang sama sudah ada" });
-    }
-
-    const createBook = await PlannerBook.create({
-      name: book_name,
-      target_start: target_start_date,
-      target_end: target_end_date,
-      target_amount,
-      user_id: req.user.id,
-    });
-    res
-      .status(201)
-      .json({ message: "Buku berhasil dibuat", bookId: createBook.id });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error creating book: ", error);
+class PlannerBookController {
+  constructor({ PlannerBookService }) {
+    this.PlannerBookService = PlannerBookService;
   }
-};
 
-exports.getAllBooks = async (req, res) => {
-  try {
-    const books = await PlannerBook.findAll({
-      where: { user_id: req.user.id },
-      order: [["id", "ASC"]],
-    });
+  createNewBook = async (req, res, next) => {
+    try {
+      const createBook = await this.PlannerBookService.createNewBook(
+        req.user.id,
+        req.body
+      );
 
-    if (books.length === 0) {
-      return res.status(404).json({ message: "Buku tidak ditemukan" });
+      res
+        .status(201)
+        .json({ message: "Buku berhasil dibuat", bookId: createBook.id });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    res.status(200).json({
-      count: books.length,
-      books_item: books.map((book) => ({
+  getBook = async (req, res, next) => {
+    try {
+      const books = await this.PlannerBookService.getBook(
+        req.user.id,
+        req.query
+      );
+
+      const booksList = books.map((book) => ({
         id: book.id,
         name: book.name,
         target_start: book.target_start,
         target_end: book.target_end,
         target_amount: book.target_amount,
         user_id: book.user_id,
-      })),
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching books: ", error);
-  }
-};
+      }));
 
-exports.updateBook = async (req, res) => {
-  const {
-    book_id,
-    book_name,
-    target_start_date,
-    target_end_date,
-    target_amount,
-  } = req.body;
-
-  try {
-    const book = await PlannerBook.findByPk(book_id);
-
-    if (!book) {
-      return res.status(404).json({ error: "Buku tidak ditemukan" });
+      res.status(200).json({
+        count: booksList.length,
+        books_item: booksList,
+      });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    const existingBook = await PlannerBook.findOne({
-      where: { name: book_name },
-    });
+  updateBook = async (req, res, next) => {
+    try {
+      const { bookId } = req.params;
+      const book = await this.PlannerBookService.updateBook(
+        req.user.id,
+        bookId,
+        req.body
+      );
 
-    if (existingBook) {
-      return res
-        .status(404)
-        .json({ error: "Buku dengan nama yang sama sudah ada" });
+      res
+        .status(200)
+        .json({ message: "Buku berhasil diperbarui", bookId: book.id });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    book.name = book_name;
-    book.target_start = target_start_date;
-    book.target_end = target_end_date;
-    book.target_amount = target_amount;
+  checkTotalAmountLimit = async (req, res, next) => {
+    try {
+      const { bookId } = req.params;
+      await this.PlannerBookService.checkTotalAmountLimit(
+        req.user.id,
+        bookId,
+        req.body
+      );
 
-    await book.save();
-
-    res
-      .status(200)
-      .json({ message: "Buku berhasil diperbarui", bookId: book.id });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error updating book: ", error);
-  }
-};
-
-exports.checkTotalAmountLimit = async (req, res) => {
-  const { book_id, current_amount } = req.body;
-
-  try {
-    const book = await PlannerBook.findByPk(book_id);
-
-    if (!book) {
-      return res.status(404).json({ error: "Buku tidak ditemukan" });
+      res
+        .status(200)
+        .json({ message: "Jumlah nominal sesuai batas yang ditentukan" });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    const totalAmount = book.target_amount;
+  createDetailPlannerBook = async (req, res, next) => {
+    try {
+      const { bookId } = req.params;
+      const detail = await this.PlannerBookService.createDetailPlannerBook(
+        req.user.id,
+        bookId,
+        req.body
+      );
 
-    if (current_amount > totalAmount) {
-      return res
-        .status(400)
-        .json({ error: "Jumlah nominal melebihi batas yang ditentukan" });
+      res
+        .status(201)
+        .json({ message: "Detail berhasil dibuat", detailId: detail.id });
+    } catch (error) {
+      next(error);
     }
+  };
 
-    res
-      .status(200)
-      .json({ message: "Jumlah nominal sesuai batas yang ditentukan" });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error checking total amount limit: ", error);
-  }
-};
+  getAllDetailPlannerBook = async (req, res, next) => {
+    try {
+      const { bookId } = req.params;
 
-exports.createDetailPlannerBook = async (req, res) => {
-  const { book_id, detail_book_name, total_amount } = req.body;
-  console.log("Received body:", req.body);
+      const details = await this.PlannerBookService.getAllDetailPlannerbook(
+        bookId,
+        req.user.id,
+      );
 
-  try {
-    const book = await PlannerBook.findByPk(book_id);
-
-    if (!book) {
-      return res.status(404).json({ error: "Buku tidak ditemukan" });
+      res.status(200).json({
+        count: details.length,
+        details_item: details.map((detail) => ({
+          id: detail.id,
+          name: detail.name,
+          total_amount: detail.total_amount,
+          planner_book_id: detail.planner_book_id,
+        })),
+      });
+    } catch (error) {
+      next(error);
     }
+  };
+}
 
-    const existingDetail = await DetailPlannerBook.findOne({
-      where: { name: detail_book_name },
-    });
-
-    if (existingDetail) {
-      return res
-        .status(400)
-        .json({ error: "Detail dengan nama yang sama sudah ada" });
-    }
-
-    const detail = await DetailPlannerBook.create({
-      name: detail_book_name,
-      total_amount,
-      planner_book_id: book_id,
-    });
-
-    res
-      .status(201)
-      .json({ message: "Detail berhasil dibuat", detailId: detail.id });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error creating detail planner book: ", error);
-  }
-};
-
-exports.getAllDetailPlannerBooks = async (req, res) => {
-  const bookId = req.params.id;
-
-  try {
-    const details = await DetailPlannerBook.findAll({
-      where: { planner_book_id: bookId },
-      order: [["id", "ASC"]],
-    });
-
-    if (details.length === 0) {
-      return res.status(404).json({ message: "Detail tidak ditemukan" });
-    }
-
-    res.status(200).json({
-      count: details.length,
-      details_item: details.map((detail) => ({
-        id: detail.id,
-        name: detail.name,
-        total_amount: detail.total_amount,
-        planner_book_id: detail.planner_book_id,
-      })),
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching detail planner books: ", error);
-  }
-};
+module.exports = PlannerBookController;

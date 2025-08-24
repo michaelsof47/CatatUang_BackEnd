@@ -1,15 +1,16 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
-const transactionController = require('../controllers/transaction_controller');
+const container = require('../container');
+const { TransactionController } = container.cradle;
 const upload = multer({ storage: multer.memoryStorage() });
 const authentication = require('../middleware/authentication');
 
-router.post('/create_transaction',authentication, upload.none(), transactionController.createTransaction);
-router.post('/create_category',authentication, upload.single('cat_url_image'), transactionController.createCategory);
-router.get('/get_transactions', authentication, transactionController.getTransaction);
-router.get('/:id/get_category_image', transactionController.getCategoryImage);
-router.get('/get_categories', authentication, transactionController.getCategory);
+router.post('/',authentication, upload.none(), TransactionController.createTransaction);
+router.get('/', authentication, TransactionController.getTransaction);
+router.post('/categories',authentication, upload.single('cat_url_image'), TransactionController.createCategory);
+router.get('/categories', authentication, TransactionController.getCategory);
+router.get('/categories/:categoryId/image', TransactionController.getCategoryImage);
 
 
 module.exports = router;

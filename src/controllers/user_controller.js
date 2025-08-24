@@ -1,286 +1,143 @@
-require("dotenv").config;
-
-const container = require('../container');
-
-const {User, bcrypt, jwt, Op, redis, sharp, generateToken, bufferToBase64, base64ToBuffer} = container.cradle;
-
-exports.registerUser = async (req, res) => {
-  const { first_name, last_name, email, phone, password } = req.body;
-  console.log("email :", email, "phone :", phone);
-  const url_user_image = req.file?.buffer;
-  const hashedPassword = bcrypt.hashSync(password, 10);
-
-  try {
-    const checkUser = await User.findOne({
-      where: {
-        [Op.or]: [{ email: email }, { phone: phone }],
-      },
-    });
-
-    if (!checkUser) {
-      let base64Image = null;
-
-      if(url_user_image) {
-        base64Image = bufferToBase64(url_user_image);
-      }
-
-      const newUser = await User.create({
-        first_name,
-        last_name,
-        url_user_image: base64Image,
-        email,
-        phone,
-        password: hashedPassword,
-        account_type_id: 1,
-      });
-
-      let accessToken = generateToken(newUser.id);
-
-      res
-        .status(201)
-        .json({
-          message: "User berhasil terdaftar",
-          user: newUser.id,
-          token: accessToken,
-        });
-    } else {
-      res.status(404).json({ error: "User sudah tersedia" });
-    }
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error registering user: ", error);
+class UserController {
+  constructor({ UserService }) {
+    this.UserService = UserService;
   }
-};
 
-exports.updatePhotoProfile = async (req, res) => {
-  const url_user_image = req.file?.buffer;
+  registerUser = async (req, res, next) => {
+    const url_user_image = req.file?.buffer;
 
-  try {
-    const user = await User.findByPk(req.user.id);
+    try {
+      const { newUser, accessToken } = await this.UserService.registerUser(
+        req.body,
+        url_user_image
+      );
 
-    if (!user) {
-      return res.status(404).json({ error: "User tidak ditemukan" });
-    }
-
-    user.url_user_image = url_user_image;
-
-    await user.save();
-
-    res.status(200).json({ message: "Foto profil berhasil diperbarui" });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error updating photo profile: ", error);
-  }
-};
-
-exports.updateProfile = async (req, res) => {
-  const {first_name, last_name, email, phone } = req.body;
-
-  try {
-    const user = await User.findByPk(req.user.id);
-    
-
-    if (!user) {
-      return res.status(404).json({ error: "User tidak ditemukan" });
-    }
-
-    user.first_name = first_name;
-    user.last_name = last_name;
-    user.email = email;
-    user.phone = phone;
-
-    await user.save();
-
-    res
-      .status(200)
-      .json({ message: "Akun berhasil diperbarui", userId: user.id });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error updating user: ", error);
-  }
-};
-
-exports.getProfileImage = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id);
-
-    if (!user || !user.url_user_image) {
-      return res.status(404).send("Foto profil tidak ditemukan");
-    }
-    const imageBuffer = base64ToBuffer(user.url_user_image);
-
-    const compressedImageBuffer = await sharp(imageBuffer,{rotate: false})
-        .resize({width: 500, height: 500})
-        .jpeg({quality: 80})
-        .toBuffer()
-    
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    res.set("Content-Type", "image/jpeg");
-
-    res.send(compressedImageBuffer);
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching profile image: ", error);
-  }
-};
-
-exports.loginUser = async (req, res) => {
-  const { emailorphone, password } = req.body;
-
-  const userIp = req.ip || req.connection.remoteAddress;
-  const loginAttemptKey = `login_attempts:${userIp}`;
-  const LOCKOUT_TIME_SECONDS = 5*60;
-
-  try {
-    const currentAttempts = await redis.get(loginAttemptKey);
-
-    if(currentAttempts && parseInt(currentAttempts) >= 3) {
-      return res.status(429).json({
-        error: `Terlalu banyak percobaan login. Silahkan coba lagi nanti ${LOCKOUT_TIME_SECONDS / 60} menit`
-      })
-    }
-
-    const user = await User.findOne({
-      where: {
-        [Op.or]: [{ email: emailorphone }, { phone: emailorphone }],
-      },
-    });
-
-    if (!user) {
-
-      await redis.incr(loginAttemptKey);
-
-      if(currentAttempts === null) {
-        await redis.setEx(loginAttemptKey, LOCKOUT_TIME_SECONDS, 'true');
-      }
-      return res.status(404).json({ error: "User tidak ditemukan" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      await redis.incr(loginAttemptKey);
-
-      if(currentAttempts === null) {
-        await redis.setEx(loginAttemptKey, LOCKOUT_TIME_SECONDS, 'true');
-      }
-      return res.status(401).json({ error: "Password salah" });
-    }
-
-    await redis.del(loginAttemptKey);
-
-    let accessToken = generateToken(user.id);
-
-    res
-      .status(200)
-      .json({ message: "Login berhasil", userId: user.id, token: accessToken });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error logging in user: ", error);
-  }
-};
-
-exports.getUserById = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ error: "User tidak ditemukan" });
-    }
-
-    res.status(200).json({
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      reward_status: user.reward_status,
-      email: user.email,
-      phone: user.phone,
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching user by ID: ", error);
-  }
-};
-
-exports.isEmailRegistered = async (req, res) => {
-  const { email } = req.body;
-
-  try {
-    const isEmailAvailable = await User.findOne({ where: { email } });
-
-    if (isEmailAvailable) {
-      const accessToken = generateToken(isEmailAvailable.id);
-      return res.status(200).json({
-        message: "Silahkan Masuk",
-        userId: isEmailAvailable.id,
+      res.status(201).json({
+        message: "User berhasil terdaftar",
+        user: newUser.id,
         token: accessToken,
       });
-    } else {
-      return res.status(200).json({ message: "Silahkan Daftar" });
+    } catch (error) {
+      next(error);
     }
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-    console.error("Error fetching user by ID: ", error);
-  }
-};
+  };
 
-exports.logoutUser = async (req, res) => {
-  const authHeader = req.headers.authorization;
-
-  if(!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(400).json({message: 'Token tidak ditemukan'});
-  }
-
-  const token = authHeader.split(' ')[1];
-
-  if(!token) {
-    return res.status(400).json({message: 'Token tidak ditemukan'});
-  }
-
-  try {
-    const decoded = jwt.decode(token);
-
-    if(!decoded || !decoded.exp) {
-      return res.status(400).json({message: 'Token tidak valid'});
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    const expiresIn = decoded.exp - now;
-
-    if(expiresIn <= 0) {
-      return res.status(200).json({message: 'Logout berhasil'});
-    }
-
-    await redis.setEx(`blacklisted:${token}`, expiresIn, 'true');
-
-    res.status(200).json({message: 'Logout berhasil'});
-  } catch (error) {
-    res.status(500).json({error: 'Internal Server Error'});
-    console.error("Error logout user by ID: ", error);
-  }
-}
-
-exports.updatePassword = async (req, res) => {
-    const { password } = req.body;
-    const hashedPassword = bcrypt.hashSync(password, 10);
-    
+  updatePhotoProfile = async (req, res, next) => {
+    const url_user_image = req.file?.buffer;
+    const userId = req.user.id;
     try {
-      const user = await User.findByPk(req.user.id);
-      
-      if (!user) {
-        return res.status(404).json({ error: "User tidak ditemukan" });
+      await this.UserService.updatePhotoProfile(url_user_image, userId);
+
+      res.status(200).json({ message: "Foto profil berhasil diperbarui" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  loginUser = async (req, res, next) => {
+    const userIp = req.ip || req.connection.remoteAddress;
+
+    try {
+      const { user, accessToken } = await this.UserService.loginUser(
+        req.body,
+        userIp
+      );
+
+      res.status(200).json({
+        message: "Login berhasil",
+        userId: user.id,
+        token: accessToken,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateProfile = async (req, res, next) => {
+    const userId = req.user.id;
+    try {
+      const user = await this.UserService.updateProfile(req.body, userId);
+
+      res
+        .status(200)
+        .json({ message: "Akun berhasil diperbarui", userId: user.id });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getProfileImage = async (req, res, next) => {
+    const { token } = req.query;
+
+    try {
+      const imageBuffer = await this.UserService.getProfileImage(token);
+
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      res.set("Content-Type", "image/jpeg");
+
+      res.send(imageBuffer);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getProfile = async (req, res, next) => {
+    try {
+      const userProfile = await this.UserService.getProfileForResponse(
+        req.user.id
+      );
+      res.status(200).json(userProfile);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  isEmailRegistered = async (req, res, next) => {
+    try {
+      const isRegistered = await this.UserService.isEmailRegistered(req.body);
+
+      if (isRegistered) {
+        res
+          .status(200)
+          .json({
+            message: "Silahkan Masuk",
+            userId: isRegistered.user.id,
+            token: isRegistered.accessToken,
+          });
+      } else {
+        res.status(200).json({ message: "Silahkan Daftar" });
       }
+    } catch (error) {
+      next(error);
+    }
+  };
 
-      user.password = hashedPassword;
+  logoutUser = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
 
-      await user.save();
+    try {
+      await this.UserService.logoutUser(authHeader);
+
+      res.status(200).json({ message: "Logout berhasil" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updatePassword = async (req, res, next) => {
+    const { password } = req.body;
+
+    try {
+      await this.UserService.updatePassword(password, req.user.id);
 
       res.status(200).json({ message: "Password berhasil diperbarui" });
     } catch (error) {
-      res.status(500).json({ error: "Internal Server Error" });
-      console.error("Error updating password: ", error);
+      next(error);
     }
-  }
+  };
+}
+
+module.exports = UserController;
