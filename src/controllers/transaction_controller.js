@@ -40,27 +40,28 @@ class TransactionController {
 
   getTransaction = async (req, res, next) => {
     try {
-      const page = parseInt(req.query.page, 10) || 1;
-      const limit = parseInt(req.query.limit, 10) || 10;
+      const page = parseInt(req.params.page, 10) || 1;
+      const limit = parseInt(req.params.limit, 10) || 10;
       const offset = (page - 1) * limit;
 
-      const { transactions, totalItems } = await this.TransactionService.getTransaction(
-        req.user.id,
-        { limit, offset }
-      );
-
-      const totalPages = Math.ceil(totalItems / limit);
+      const { transactions, totalItems } =
+        await this.TransactionService.getTransaction(req.user.id, {
+          limit,
+          offset,
+        });
 
       res.status(200).json({
         pagination: {
-          totalItems,
-          totalPages,
           currentPage: page,
           pageSize: limit,
+          totalItems: totalItems,
         },
         data: transactions.map((transaction) => ({
           id: transaction.id,
           name: transaction.name,
+          transaction_date: transaction.transaction_date
+            .toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" })
+            .replace(" ", "T"),
           amount: transaction.amount,
           outlet_name: transaction.outlet_name,
           price: transaction.price,
@@ -105,6 +106,17 @@ class TransactionController {
 
       res.set("Content-Type", "image/jpeg");
       res.send(categoryImage);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  removeCategory = async (req, res, next) => {
+    const { categoryId } = req.params;
+    try {
+      await this.TransactionService.removeCategory(categoryId, req.user.id);
+
+      res.status(200).json({ message: "Kategori berhasil dihapus. " });
     } catch (error) {
       next(error);
     }

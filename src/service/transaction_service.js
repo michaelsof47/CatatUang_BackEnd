@@ -1,4 +1,9 @@
-const { NotFoundError, BadRequestError, AuthenticationError } = require("../utils/index");
+const {
+  NotFoundError,
+  BadRequestError,
+  AuthenticationError,
+  ConflictError,
+} = require("../utils/index");
 
 class TransactionService {
   constructor({
@@ -47,6 +52,7 @@ class TransactionService {
     try {
       const {
         trans_name,
+        trans_date,
         trans_amount,
         outlet_name,
         trans_price,
@@ -65,12 +71,13 @@ class TransactionService {
         throw new BadRequestError("Saldo akun tidak tersedia");
       }
 
-      balance.balances_amount -= trans_total_price;
+      balance.balances_amount -= parseInt(trans_total_price);
       await balance.save({ transaction: t });
 
       const newTransaction = await this.Transaction.create(
         {
           name: trans_name,
+          transaction_date: trans_date,
           amount: trans_amount,
           outlet_name,
           price: trans_price,
@@ -110,7 +117,10 @@ class TransactionService {
     const { limit, offset } = paginationOptions;
     const { count, rows } = await this.Transaction.findAndCountAll({
       where: { user_id: userId },
-      order: [["id", "DESC"]],
+      order: [
+        ["transaction_date", "DESC"],
+        ["id", "DESC"],
+      ],
       limit,
       offset,
     });
@@ -159,7 +169,6 @@ class TransactionService {
       throw new AuthenticationError("Invalid Token");
     }
 
-    // Security check: Memastikan token yang diberikan adalah untuk resource yang diminta
     if (payload.categoryId.toString() !== categoryIdFromUrl) {
       throw new AuthenticationError("Invalid token for this resource");
     }
@@ -175,6 +184,33 @@ class TransactionService {
     const imageBuffer = this.base64ToBuffer(categoryImage.url_image);
 
     return imageBuffer;
+  }
+
+  async removeCategory(categoryId, userId) {
+    console.log(userId);
+    const category = await this.Category.findOne({
+      where: { id: categoryId, user_id: userId },
+    });
+
+    if (!category) {
+      throw new NotFoundError("Kategori tidak ditemukan");
+    }
+
+    const transactionCount = await this.Transaction.count({
+      where: { category_id: categoryId, user_id: userId },
+    });
+
+    if (transactionCount > 0) {
+      throw new ConflictError(
+        `Kategori "${category.name}" tidak dapat dihapus karena sudah digunakan oleh ${transactionCount} transaksi.`
+      );
+    }
+
+    const deleteRow = await this.Category.destroy({
+      where: { id: categoryId, user_id: userId },
+    });
+
+    return deleteRow;
   }
 }
 

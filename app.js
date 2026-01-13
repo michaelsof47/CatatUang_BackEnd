@@ -26,19 +26,19 @@ function errorHandler(err, req, res, next) {
   console.error("Global Error Handler:", err); // Logging error
 
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({ error: err.message });
+    return res.status(err.statusCode).json({ message: err.message });
   }
 
   if (err.name === "Invalid Token" || err.name === "JsonWebTokenError") {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(401).json({ message: "Invalid or expired token" });
   }
 
   if (err.name === "TokenExpiredError") {
-    return res.status(401).json({ error: "Token has expired, please login again" });
+    return res.status(401).json({ message: "Token has expired, please login again" });
   }
 
   // Default to 500 server error
-  return res.status(500).json({ error: "Internal Server Error" });
+  return res.status(500).json({ message: "Internal Server Error" });
 }
 
 sequelize.sync({ alter: true })

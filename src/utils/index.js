@@ -13,12 +13,6 @@ class NotFoundError extends AppError {
   }
 }
 
-class ConflictError extends AppError {
-  constructor(message = 'Resource already exists') {
-    super(message, 409);
-  }
-}
-
 class BadRequestError extends AppError {
   constructor(message = 'Bad Request') {
     super(message, 400);
@@ -37,4 +31,10 @@ class TooManyRequestsError extends AppError {
   }
 }
 
-module.exports = { AppError, NotFoundError, ConflictError, BadRequestError, AuthenticationError, TooManyRequestsError };
+class ConflictError extends AppError {
+  constructor(message = 'Resource already exists') {
+    super(message, 409);
+  }
+}
+
+module.exports = { AppError, NotFoundError, BadRequestError, AuthenticationError, TooManyRequestsError, ConflictError };
