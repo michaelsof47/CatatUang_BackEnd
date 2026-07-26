@@ -29,10 +29,6 @@ router.delete(
   TransactionController.removeCategory
 );
 
-router.get(
-  "/:page/:limit",
-  authentication,
-  TransactionController.getTransaction
-);
+router.get("/", authentication, TransactionController.getTransaction);
 
 module.exports = router;

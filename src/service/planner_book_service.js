@@ -30,22 +30,32 @@ class PlannerbookService {
     return createBook;
   }
 
-  async getBook(userId, userData) {
-    const { book_name: bookName } = userData || {};
+  async getBook(userId, paginationOptions) {
+    const { limit, offset, bookName } = paginationOptions;
 
     const whereClause = {
       user_id: userId,
     };
-    if (bookName) {
+
+    if (typeof bookName === "string" && bookName.trim()) {
       whereClause.name = { [this.Op.iLike]: `%${bookName}%` };
     }
 
-    const book = await this.PlannerBook.findAll({
+    const { count, rows } = await this.PlannerBook.findAndCountAll({
       where: whereClause,
-      order: [["id", "ASC"]],
+      order: [
+        ["id", "ASC"],
+        ["target_start", "ASC"],
+      ],
+      limit,
+      offset,
     });
 
-    return book;
+    if (rows.length === 0 && offset === 0) {
+      throw new NotFoundError("Buku perencanaan tidak ditemukan");
+    }
+    
+    return { books: rows, totalItems: count };
   }
 
   async updateBook(userId, bookId, userData) {

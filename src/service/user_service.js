@@ -15,8 +15,7 @@ class UserService {
     redis,
     sharp,
     generateToken,
-    bufferToBase64,
-    base64ToBuffer,
+    localStorageService,
   }) {
     this.User = User;
     this.bcrypt = bcrypt;
@@ -25,18 +24,12 @@ class UserService {
     this.redis = redis;
     this.sharp = sharp;
     this.generateToken = generateToken;
-    this.bufferToBase64 = bufferToBase64;
-    this.base64ToBuffer = base64ToBuffer;
+    this.storage = localStorageService;
   }
 
-  _generateProfileImageUrl(userId) {
-    const imageToken = this.jwt.sign(
-      { userId: userId },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    return `user/profile/picture?token=${imageToken}`;
+  _generateProfileImageUrl(filePath) {
+    // Serve langsung via static route /uploads
+    return `uploads/${filePath}`;
   }
 
   async _compressImage(buffer) {
@@ -70,17 +63,22 @@ class UserService {
       throw new ConflictError("User sudah tersedia");
     }
 
-    let base64Image = null;
+    let imagePath = null;
 
     if (userImageBuffer) {
-      const compressedImageBuffer = await this._compressImage(userImageBuffer);
-      base64Image = this.bufferToBase64(compressedImageBuffer);
+      const compressedBuffer = await this._compressImage(userImageBuffer);
+      const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+      imagePath = this.storage.saveImageLocally(
+        compressedBuffer,
+        "profiles",
+        filename,
+      );
     }
 
     const newUser = await this.User.create({
       first_name,
       last_name,
-      url_user_image: base64Image,
+      url_user_image: imagePath,
       email,
       phone,
       password: hashedPassword,
@@ -96,9 +94,19 @@ class UserService {
     const user = await this._findUserOrFail(userId);
 
     if (imageBuffer) {
-      const compressedImageBuffer = await this._compressImage(imageBuffer);
-      const base64Image = this.bufferToBase64(compressedImageBuffer);
-      await user.update({ url_user_image: base64Image });
+      // Hapus foto lama dari disk jika ada
+      if (user.url_user_image) {
+        this.storage.deleteImageLocally(user.url_user_image);
+      }
+
+      const compressedBuffer = await this._compressImage(imageBuffer);
+      const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+      const imagePath = this.storage.saveImageLocally(
+        compressedBuffer,
+        "profiles",
+        filename,
+      );
+      await user.update({ url_user_image: imagePath });
     }
 
     return user;
@@ -112,7 +120,9 @@ class UserService {
 
     const attempts = await this.redis.get(loginAttemptKey);
     if (attempts && parseInt(attempts) >= MAX_ATTEMPTS) {
-      throw new TooManyRequestsError(`Terlalu banyak percobaan login. Silahkan coba lagi nanti ${LOCKOUT_TIME_SECONDS / 60} menit`);
+      throw new TooManyRequestsError(
+        `Terlalu banyak percobaan login. Silahkan coba lagi nanti ${LOCKOUT_TIME_SECONDS / 60} menit`,
+      );
     }
 
     const user = await this.User.findOne({
@@ -153,33 +163,25 @@ class UserService {
     const user = await this._findUserOrFail(userId);
 
     await user.update({
-      first_name, last_name, email, phone
+      first_name,
+      last_name,
+      email,
+      phone,
     });
 
     return user;
   }
 
-  async getProfileImage(imageToken) {
-    if (!imageToken) {
-      throw new BadRequestError("Token tidak ditemukan");
+  async getProfileImage(userId) {
+    const user = await this._findUserOrFail(userId);
+
+    if (!user.url_user_image) {
+      throw new NotFoundError("Foto Profil Tidak Ditemukan");
     }
 
-    let payload;
+    const buffer = this.storage.readImageLocally(user.url_user_image)
 
-    try {
-      payload = this.jwt.verify(imageToken, process.env.JWT_SECRET);
-    } catch (error) {
-      throw new AuthenticationError("Invalid Token");
-    }
-
-    const user = await this.User.findByPk(payload.userId);
-
-    if (!user || !user.url_user_image) {
-      throw new NotFoundError("Foto profil tidak ditemukan");
-    }
-    const imageBuffer = this.base64ToBuffer(user.url_user_image);
-
-    return imageBuffer;
+    return buffer
   }
 
   async getUserById(userId) {
@@ -191,7 +193,7 @@ class UserService {
     const user = await this.getUserById(userId);
 
     const profileImageUrl = user.url_user_image
-      ? this._generateProfileImageUrl(userId)
+      ? this._generateProfileImageUrl(user.url_user_image)
       : null;
 
     return {
@@ -209,7 +211,7 @@ class UserService {
     const { email } = userData;
     const user = await this.User.findOne({ where: { email } });
     let accessToken = this.generateToken(user.id);
-    return {user, accessToken};
+    return { user, accessToken };
   }
 
   async logoutUser(authHeader) {

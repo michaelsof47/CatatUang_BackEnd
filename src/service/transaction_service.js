@@ -6,45 +6,23 @@ const {
 } = require("../utils/index");
 
 class TransactionService {
-  constructor({
-    Transaction,
-    Category,
-    Balances,
-    bufferToBase64,
-    base64ToBuffer,
-    sharp,
-    jwt,
-  }) {
+  constructor({ Transaction, Category, Balances, sharp, localStorageService }) {
     this.Transaction = Transaction;
     this.Category = Category;
     this.Balances = Balances;
-    this.bufferToBase64 = bufferToBase64;
-    this.base64ToBuffer = base64ToBuffer;
     this.sharp = sharp;
-    this.jwt = jwt;
+    this.storage = localStorageService;
   }
 
-  // Helper "private" untuk memproses gambar
-  async _compressAndEncodeImage(buffer) {
+  // Helper: compress gambar dan simpan ke disk lokal
+  async _compressAndSaveImage(buffer, folder) {
     if (!buffer) return null;
-    const compressedBuffer = await this.sharp(buffer, {
-      rotate: false,
-    })
+    const compressedBuffer = await this.sharp(buffer, { rotate: false })
       .resize({ width: 500, height: 500 })
       .jpeg({ quality: 80 })
       .toBuffer();
-    return this.bufferToBase64(compressedBuffer);
-  }
-
-  // Helper "private" untuk menandatangani token tanpa query database
-  _generateCategoryImageUrl(categoryId, userId) {
-    const imageToken = this.jwt.sign(
-      { categoryId: categoryId, userId: userId },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    return `transactions/categories/${categoryId}/image?token=${imageToken}`;
+    const filename = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    return this.storage.saveImageLocally(compressedBuffer, folder, filename);
   }
 
   async createTransaction(userId, userData) {
@@ -87,7 +65,7 @@ class TransactionService {
           user_id: userId,
           category_id: category_id,
         },
-        { transaction: t }
+        { transaction: t },
       );
 
       await t.commit();
@@ -101,12 +79,15 @@ class TransactionService {
   async createCategory(userId, userData, imageBuffer) {
     const { cat_name, cat_desc } = userData;
 
-    const base64Image = await this._compressAndEncodeImage(imageBuffer);
+    const imagePath = await this._compressAndSaveImage(
+      imageBuffer,
+      "categories",
+    );
 
     const newCategory = await this.Category.create({
       name: cat_name,
       description: cat_desc,
-      url_image: base64Image,
+      url_image: imagePath,
       user_id: userId,
     });
 
@@ -114,9 +95,16 @@ class TransactionService {
   }
 
   async getTransaction(userId, paginationOptions) {
-    const { limit, offset } = paginationOptions;
+    const { limit, offset, categoryId } = paginationOptions;
+
+    const whereClause = { user_id: userId };
+
+    if (categoryId) {
+      whereClause.category_id = categoryId;
+    }
+
     const { count, rows } = await this.Transaction.findAndCountAll({
-      where: { user_id: userId },
+      where: whereClause,
       order: [
         ["transaction_date", "DESC"],
         ["id", "DESC"],
@@ -142,9 +130,8 @@ class TransactionService {
     }
 
     const categoriesWithUrls = categories.map((cat) => {
-      const imageUrl = cat.url_image
-        ? this._generateCategoryImageUrl(cat.id, userId)
-        : null;
+      // Gambar di-serve langsung via static /uploads/<path>
+      const imageUrl = cat.url_image ? `uploads/${cat.url_image}` : null;
       return {
         id: cat.id,
         name: cat.name,
@@ -157,33 +144,12 @@ class TransactionService {
   }
 
   async getCategoryImage(imageToken, categoryIdFromUrl) {
-    if (!imageToken) {
-      throw new BadRequestError("Token tidak ditemukan");
-    }
-
-    let payload;
-
-    try {
-      payload = this.jwt.verify(imageToken, process.env.JWT_SECRET);
-    } catch (error) {
-      throw new AuthenticationError("Invalid Token");
-    }
-
-    if (payload.categoryId.toString() !== categoryIdFromUrl) {
-      throw new AuthenticationError("Invalid token for this resource");
-    }
-
-    const categoryImage = await this.Category.findOne({
-      where: { id: payload.categoryId, user_id: payload.userId },
-    });
-
-    if (!categoryImage || !categoryImage.url_image) {
-      throw new NotFoundError("Gambar kategori tidak ditemukan");
-    }
-
-    const imageBuffer = this.base64ToBuffer(categoryImage.url_image);
-
-    return imageBuffer;
+    // Endpoint ini tidak lagi diperlukan — gambar di-serve static via /uploads.
+    // Tetap ada untuk backward compat.
+    const { NotFoundError } = require("../utils/index");
+    throw new NotFoundError(
+      "Gunakan URL gambar yang diberikan dari /transactions/categories",
+    );
   }
 
   async removeCategory(categoryId, userId) {
@@ -202,8 +168,13 @@ class TransactionService {
 
     if (transactionCount > 0) {
       throw new ConflictError(
-        `Kategori "${category.name}" tidak dapat dihapus karena sudah digunakan oleh ${transactionCount} transaksi.`
+        `Kategori "${category.name}" tidak dapat dihapus karena sudah digunakan oleh ${transactionCount} transaksi.`,
       );
+    }
+
+    // Hapus file gambar dari disk jika ada
+    if (category.url_image) {
+      this.storage.deleteImageLocally(category.url_image);
     }
 
     const deleteRow = await this.Category.destroy({

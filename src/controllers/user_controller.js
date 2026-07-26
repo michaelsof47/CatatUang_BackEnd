@@ -67,10 +67,10 @@ class UserController {
   };
 
   getProfileImage = async (req, res, next) => {
-    const { token } = req.query;
+    const userId = req.user.id;
 
     try {
-      const imageBuffer = await this.UserService.getProfileImage(token);
+      const imageBuffer = await this.UserService.getProfileImage(userId);
 
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Pragma", "no-cache");

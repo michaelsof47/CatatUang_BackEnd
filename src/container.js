@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const sharp = require("sharp");
 const redis = require("./config/redis");
+const localStorageService = require("./utils/local_storage");
 
 const User = require("./models/user");
 const Balances = require("./models/balance");
@@ -64,22 +65,24 @@ container.register({
       (id) =>
         jwt.sign({ id }, process.env.JWT_SECRET, {
           expiresIn: "7d",
-        })
+        }),
   ).singleton(),
 
+  // Tetap ada untuk backward compat (tidak dipakai untuk simpan ke DB)
   bufferToBase64: asFunction(() => (buffer) => {
     return buffer.toString("base64");
   }).singleton(),
 
   base64ToBuffer: asFunction(() => (base64) => {
     const matches = base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-
     if (!matches || matches.length !== 3) {
       return Buffer.from(base64, "base64");
     }
-
     return Buffer.from(matches[2], "base64");
   }).singleton(),
+
+  // Local storage (DEVELOPMENT) — nanti swap ke S3/Biznet GIO untuk production
+  localStorageService: asValue(localStorageService),
 });
 
 module.exports = container;

@@ -40,14 +40,17 @@ class TransactionController {
 
   getTransaction = async (req, res, next) => {
     try {
-      const page = parseInt(req.params.page, 10) || 1;
-      const limit = parseInt(req.params.limit, 10) || 10;
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 10;
+      const categoryId = req.query.categoryId;
+
       const offset = (page - 1) * limit;
 
       const { transactions, totalItems } =
         await this.TransactionService.getTransaction(req.user.id, {
           limit,
           offset,
+          categoryId,
         });
 
       res.status(200).json({
@@ -67,6 +70,7 @@ class TransactionController {
           price: transaction.price,
           disc_percent: transaction.disc_percent,
           disc_rp: transaction.disc_rp,
+          category_id: transaction.category_id,
           total_price: transaction.total_price,
           created_at: transaction.createdAt,
         })),

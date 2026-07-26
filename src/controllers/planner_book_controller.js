@@ -20,9 +20,18 @@ class PlannerBookController {
 
   getBook = async (req, res, next) => {
     try {
-      const books = await this.PlannerBookService.getBook(
-        req.user.id,
-        req.query
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 10;
+      const offset = (page - 1) * limit;
+
+      const bookName = req.query.book_name;
+
+      const { books, totalItems } = await this.PlannerBookService.getBook(
+        req.user.id, {
+          limit,
+          offset,
+          bookName,
+        }
       );
 
       const booksList = books.map((book) => ({
@@ -35,7 +44,11 @@ class PlannerBookController {
       }));
 
       res.status(200).json({
-        count: booksList.length,
+        pagination: {
+          currentPage: page,
+          pageSize: limit,
+          totalItems: totalItems,
+        },
         books_item: booksList,
       });
     } catch (error) {
