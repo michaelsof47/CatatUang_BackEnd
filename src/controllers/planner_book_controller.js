@@ -49,7 +49,7 @@ class PlannerBookController {
           pageSize: limit,
           totalItems: totalItems,
         },
-        books_item: booksList,
+        data: booksList,
       });
     } catch (error) {
       next(error);

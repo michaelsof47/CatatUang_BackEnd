@@ -2,9 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const container = require('../container');
 const router = express.Router();
-const { UserController } = container.cradle;
+const { UserController, authentication } = container.cradle;
 const upload = multer({ storage: multer.memoryStorage() });
-const authentication = require('../middleware/authentication');
 
 router.post('/register', upload.single('url_user_image'), UserController.registerUser);
 router.post('/login', upload.none(), UserController.loginUser);

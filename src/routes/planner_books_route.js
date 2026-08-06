@@ -2,9 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const container = require('../container');
-const { PlannerBookController } = container.cradle;
+const { PlannerBookController, authentication } = container.cradle;
 const upload = multer({ storage: multer.memoryStorage() });
-const authentication = require('../middleware/authentication');
 
 router.post('/', authentication, upload.none(), PlannerBookController.createNewBook);
 router.get('/', authentication, PlannerBookController.getBook);

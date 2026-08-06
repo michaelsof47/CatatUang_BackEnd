@@ -2,9 +2,8 @@ const express = require("express");
 const multer = require("multer");
 const router = express.Router();
 const container = require("../container");
-const { TransactionController } = container.cradle;
+const { TransactionController, authentication } = container.cradle;
 const upload = multer({ storage: multer.memoryStorage() });
-const authentication = require("../middleware/authentication");
 
 router.post(
   "/",
